@@ -73,6 +73,29 @@ function App() {
           value={dateAndTime as string}
           onChange={(e) => setDateAndTime(e.target.value)}
         />
+        <button
+          type="button"
+          onClick={() => {
+            const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            const formatted =
+              now.getFullYear() +
+              "-" +
+              pad(now.getMonth() + 1) +
+              "-" +
+              pad(now.getDate()) +
+              "  " +
+              pad(now.getHours()) +
+              ":" +
+              pad(now.getMinutes()) +
+              ":" +
+              pad(now.getSeconds());
+            setDateAndTime(formatted);
+          }}
+          style={{ padding: "6px 12px" }}
+        >
+          Поточна
+        </button>
       </div>
 
       <div className="form-row">
