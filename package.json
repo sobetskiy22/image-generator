@@ -1,7 +1,7 @@
 {
   "name": "vovastik",
   "private": true,
-  "homepage": ".",
+  "homepage": "https://sobetskiy22.github.io/image-generator",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
