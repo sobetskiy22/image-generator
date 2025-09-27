@@ -1,20 +1,21 @@
 {
   "name": "image-generator",
   "private": true,
+  "homepage": "https://sobetskiy22.github.io/image-generator",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "pixi.js": "^8.13.2",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
