@@ -103,7 +103,7 @@ function App() {
         <label>Беграунд:</label>
 
          <select value={background as number} onChange={(e) => setBackground(Number(e.target.value))}>
-          {images.map((img, index) => (
+          {images.map((_img, index) => (
             <option key={index} value={index}>
               {index + 1}
             </option>
