@@ -3,6 +3,7 @@ import { useState } from "react";
 // import viteLogo from '/vite.svg'
 import "./App.css";
 import { ImageComponent } from "./ImageComponent";
+import { images } from "./images";
 
 function App() {
   const [coinName, setCoinName] = useState("");
@@ -102,10 +103,11 @@ function App() {
         <label>Беграунд:</label>
 
          <select value={background as number} onChange={(e) => setBackground(Number(e.target.value))}>
-          <option value={0}>1</option>
-          <option value={1}>2</option>
-          <option value={2}>3</option>
-          <option value={3}>4</option>
+          {images.map((img, index) => (
+            <option key={index} value={index}>
+              {index + 1}
+            </option>
+          ))}
         </select>
       </div>
 
