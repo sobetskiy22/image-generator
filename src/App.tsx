@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 // import reactLogo from './assets/react.svg'
 // import viteLogo from '/vite.svg'
 import "./App.css";
 import { ImageComponent } from "./ImageComponent";
-import { images } from "./images";
+import {
+  addStoredImage,
+  deleteStoredImage,
+  getStoredImages,
+  type StoredImage,
+} from "./indexedDbImages";
+
+type UiImage = StoredImage & { previewUrl: string };
 
 function App() {
   const [coinName, setCoinName] = useState("");
@@ -11,8 +18,86 @@ function App() {
   const [loverage, setLoverage] = useState(10);
   const [inputPrice, setInputPrice] = useState("");
   const [closePrice, setClosePrice] = useState("");
-  const [background, setBackground] = useState(0);
+  const [backgroundId, setBackgroundId] = useState<number | null>(null);
   const [dateAndTime, setDateAndTime] = useState("");
+  const [images, setImages] = useState<UiImage[]>([]);
+  const previewUrlsRef = useRef<Map<number, string>>(new Map());
+
+  const selectedBackgroundUrl = useMemo(() => {
+    return images.find((image) => image.id === backgroundId)?.previewUrl;
+  }, [images, backgroundId]);
+
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
+
+    void loadImages();
+
+    return () => {
+      for (const url of previewUrls.values()) {
+        URL.revokeObjectURL(url);
+      }
+      previewUrls.clear();
+    };
+  }, []);
+
+  async function loadImages() {
+    const storedImages = await getStoredImages();
+
+    const next = storedImages.map((image) => {
+      const existingUrl = previewUrlsRef.current.get(image.id);
+      const previewUrl = existingUrl ?? URL.createObjectURL(image.blob);
+
+      if (!existingUrl) {
+        previewUrlsRef.current.set(image.id, previewUrl);
+      }
+
+      return {
+        ...image,
+        previewUrl,
+      };
+    });
+
+    const nextIds = new Set(next.map((image) => image.id));
+
+    for (const [id, url] of previewUrlsRef.current.entries()) {
+      if (!nextIds.has(id)) {
+        URL.revokeObjectURL(url);
+        previewUrlsRef.current.delete(id);
+      }
+    }
+
+    setImages(next);
+    setBackgroundId((current) => {
+      if (current !== null && next.some((image) => image.id === current)) {
+        return current;
+      }
+
+      return next[0]?.id ?? null;
+    });
+  }
+
+  async function handleUploadBackgrounds(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+
+    await Promise.all(imageFiles.map((file) => addStoredImage(file)));
+    await loadImages();
+
+    event.target.value = "";
+  }
+
+  async function handleDeleteSelectedBackground() {
+    if (backgroundId === null) {
+      return;
+    }
+
+    await deleteStoredImage(backgroundId);
+    await loadImages();
+  }
 
   return (
     <>
@@ -100,18 +185,49 @@ function App() {
       </div>
 
       <div className="form-row">
-        <label>Беграунд:</label>
+        <label>Фони:</label>
 
-         <select value={background as number} onChange={(e) => setBackground(Number(e.target.value))}>
-          {images.map((_img, index) => (
-            <option key={index} value={index}>
-              {index + 1}
-            </option>
-          ))}
-        </select>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleUploadBackgrounds}
+        />
       </div>
 
-      <ImageComponent coinName={coinName} type={type} loverage={loverage} inputPrice={inputPrice} closePrice={closePrice} bgIndex={background} dateAndTime={dateAndTime} />
+      <div className="form-row">
+        <label>Беграунд:</label>
+
+         <select
+          value={backgroundId ?? ""}
+          onChange={(e) => setBackgroundId(Number(e.target.value))}
+          disabled={images.length === 0}
+        >
+          {images.length === 0 ? (
+            <option value="">Немає завантажених фонів</option>
+          ) : (
+            images.map((image, index) => (
+            <option key={image.id} value={image.id}>
+              {index + 1}. {image.name}
+            </option>
+            ))
+          )}
+        </select>
+
+        <button type="button" onClick={handleDeleteSelectedBackground} disabled={backgroundId === null}>
+          Видалити
+        </button>
+      </div>
+
+      <ImageComponent
+        coinName={coinName}
+        type={type}
+        loverage={loverage}
+        inputPrice={inputPrice}
+        closePrice={closePrice}
+        backgroundUrl={selectedBackgroundUrl}
+        dateAndTime={dateAndTime}
+      />
     </>
   );
 }

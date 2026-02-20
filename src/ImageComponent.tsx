@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { images } from "./images";
 import {
   Application,
   Assets,
   Sprite,
+  Texture,
   TextStyle,
   Text,
   Rectangle,
@@ -18,7 +18,7 @@ type ImageComponentProps = {
   loverage: number;
   inputPrice: string;
   closePrice: string;
-  bgIndex: number;
+  backgroundUrl?: string;
   dateAndTime: string
 };
 
@@ -28,7 +28,7 @@ export function ImageComponent({
   loverage,
   inputPrice,
   closePrice,
-  bgIndex,
+  backgroundUrl,
   dateAndTime
 }: ImageComponentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,16 +59,14 @@ export function ImageComponent({
     const f = async () => {
       await document.fonts.ready;
       app.stage.removeChildren();
-      //@ts-expect-error
+      //@ts-expect-error needed for pixi app debugging handle on globalThis
       globalThis.__PIXI_APP__ = app;
       if (!containerRef.current) {
         return;
       }
       containerRef.current.appendChild(app.canvas as HTMLCanvasElement);
 
-      const texture = await base64ToTexture(images[bgIndex]);
-      const background = new Sprite(texture);
-      background.zIndex = -1;
+      const background = backgroundUrl ? await buildBackgroundSprite(backgroundUrl) : null;
       const logoTexture = await Assets.load(logo); // logo = URL до svg
       const sprite = new Sprite(logoTexture);
       sprite.position.set(49, 53);
@@ -237,7 +235,6 @@ export function ImageComponent({
         typeText,
         currencyText,
         sprite,
-        background,
         introLabelText,
         outroLabelText,
         introText,
@@ -248,12 +245,17 @@ export function ImageComponent({
         perpText,
         rect,
       ];
+
+      if (background) {
+        children.unshift(background);
+      }
+
       children.forEach((child) => app.stage.addChild(child));
     };
 
     f()
 
-  }, [coinName, type, loverage, inputPrice, closePrice, bgIndex, dateAndTime, app]);
+  }, [coinName, type, loverage, inputPrice, closePrice, backgroundUrl, dateAndTime, app]);
 
   async function downloadImage() {
     if (!app) return;
@@ -316,7 +318,36 @@ export function ImageComponent({
   );
 }
 
-async function base64ToTexture(base64: string) {
-  const texture = await Assets.load(base64);
-  return texture;
+async function buildBackgroundSprite(backgroundUrl: string): Promise<Sprite | null> {
+  try {
+    const texture = await loadTextureFromUrl(backgroundUrl);
+
+    if (!texture) {
+      return null;
+    }
+
+    const background = new Sprite(texture);
+    background.zIndex = -1;
+    return background;
+  } catch (error) {
+    console.error("Failed to load background texture", error);
+    return null;
+  }
+}
+
+async function loadTextureFromUrl(url: string): Promise<Texture | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      const texture = Texture.from(image);
+      resolve(texture);
+    };
+
+    image.onerror = () => {
+      resolve(null);
+    };
+
+    image.src = url;
+  });
 }
