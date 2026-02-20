@@ -273,10 +273,43 @@ export function ImageComponent({
     link.click();
   }
 
+  async function copyImageToClipboard() {
+  if (!app) return;
+
+  const canvas = await app.renderer.extract.canvas({
+    target: app.stage,
+    frame: new Rectangle(0, 0, 960, 1070),
+    resolution: 2,
+    antialias: true,
+  });
+
+  const blob: Blob | null = await new Promise((resolve) => {
+    if (canvas.toBlob) {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, "image/png", 0.8);
+    }
+  });
+
+  if (!blob) return;
+
+  // Копіюємо в буфер
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      "image/png": blob,
+    }),
+  ]);
+
+  console.log("Image copied to clipboard ✅");
+}
+
   return (
     <>
       <button onClick={downloadImage} style={{ margin: "12px" }}>
         Download
+      </button>
+      <button onClick={copyImageToClipboard} style={{ margin: "12px" }}>
+        Copy
       </button>
       <div ref={containerRef} className="pixi-wrapper"></div>
     </>
