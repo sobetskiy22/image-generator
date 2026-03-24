@@ -294,7 +294,7 @@ async function renderLegacyTemplate({
   });
 
   const pnlText = new Text({
-    text: legacy.pnlPercent(pnl),
+    text: formatPercentTruncated(pnl),
     style: pnlTextStyle,
   });
   pnlText.position.set(49, 378);
@@ -376,6 +376,8 @@ async function renderCompactTemplate({
   closePrice,
   backgroundUrl,
 }: RenderBaseProps) {
+  const compactFontFamily = 'HarmonyOS EnNumber, -apple-system, BlinkMacSystemFont, sans-serif';
+  await document.fonts.load('400 16px "HarmonyOS EnNumber"');
   const { compact } = exchange.texts;
   const { width, height } = exchange.imageSize;
   const background = backgroundUrl
@@ -388,45 +390,45 @@ async function renderCompactTemplate({
   logoSprite.scale.set(0.37);
 
   const mainTitleStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 34.5,
-    fontWeight: "500",
+    fontWeight: "400",
     fill: "#ffffff",
   });
 
   const rowMainStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 43.5,
     fontWeight: "700",
     fill: "#ffffff",
   });
 
   const rowSeparatorStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 35,
     fontWeight: "normal",
     fill: "#6d7384",
   });
 
   const rowSideStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 43.5,
     fontWeight: "700",
     fill: type === 0 ? "#00e28a" : "#f14b3f",
   });
 
   const grayStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 32,
     fontWeight: "400",
     fill: "#7f8596",
   });
 
   const valueStyle = new TextStyle({
-    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontFamily: compactFontFamily,
     fontSize: 32,
     fontWeight: "500",
-    fill: "#7f8596",
+    fill: "#ffffff",
   });
 
   const pnlTitle = new Text({
@@ -492,10 +494,10 @@ async function renderCompactTemplate({
   const pnlUnsigned = getPnl(inputPrice, closePrice, type, loverage, { unsigned: true });
   const pnlColor = pnlSigned >= 0 ? "#24c18d" : "#f14b3f";
   const pnlText = new Text({
-    text: `${pnlUnsigned.toFixed(2)}%`,
+    text: formatPercentTruncated(pnlUnsigned, { unsigned: true }),
     style: new TextStyle({
-      fontFamily: "Plus Jakarta Sans, sans-serif",
-      fontSize: 110,
+      fontFamily: compactFontFamily,
+      fontSize: 125,
       fontWeight: "600",
       fill: pnlColor,
     }),
@@ -513,7 +515,7 @@ async function renderCompactTemplate({
   lastPriceLabel.position.set(48, height - 176);
 
   const lastPriceValue = new Text({
-    text: closePrice || compact.emptyValue,
+    text: formatDisplayPrice(closePrice, compact.emptyValue),
     style: valueStyle
   });
   lastPriceValue.position.set(lastPriceLabel.x + lastPriceLabel.width + 50, height - 176);
@@ -529,7 +531,7 @@ async function renderCompactTemplate({
   entryPriceLabel.position.set(48, height - 115);
 
   const entryPriceValue = new Text({
-    text: inputPrice || compact.emptyValue,
+    text: formatDisplayPrice(inputPrice, compact.emptyValue),
     style: valueStyle
   });
   entryPriceValue.position.set(entryPriceLabel.x + entryPriceLabel.width + 44, height - 115);
@@ -565,6 +567,10 @@ type GetPnlOptions = {
   unsigned?: boolean;
 };
 
+type FormatPercentOptions = {
+  unsigned?: boolean;
+};
+
 function getPnl(
   inputPrice: string,
   closePrice: string,
@@ -588,6 +594,50 @@ function getPnl(
   }
 
   return pnl;
+}
+
+function formatPercentTruncated(value: number, options: FormatPercentOptions = {}): string {
+  const abs = Math.abs(value);
+  const truncated = Math.floor(abs * 100) / 100;
+  const formatted = truncated.toFixed(2);
+
+  if (options.unsigned) {
+    return `${formatted}%`;
+  }
+
+  if (value > 0) {
+    return `+${formatted}%`;
+  }
+
+  if (value < 0) {
+    return `-${formatted}%`;
+  }
+
+  return `${formatted}%`;
+}
+
+function formatDisplayPrice(value: string, fallback: string): string {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.trim().replace(/\s+/g, "").replace(",", ".");
+  if (!normalized) {
+    return fallback;
+  }
+
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric)) {
+    return value;
+  }
+
+  const decimalPart = normalized.includes(".") ? normalized.split(".")[1] : "";
+  const fractionDigits = decimalPart.length;
+
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(numeric);
 }
 
 async function buildBackgroundSpriteLegacy(backgroundUrl: string): Promise<Sprite | null> {
