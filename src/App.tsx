@@ -2,17 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // import reactLogo from './assets/react.svg'
 // import viteLogo from '/vite.svg'
 import "./App.css";
-import { ImageComponent } from "./ImageComponent";
+import { ImageComponent } from "./ImageComponent.tsx";
 import {
   addStoredImage,
   deleteStoredImage,
   getStoredImages,
   type StoredImage,
 } from "./indexedDbImages";
+import {
+  DEFAULT_EXCHANGE_KEY,
+  EXCHANGE_CONFIGS,
+  EXCHANGE_ORDER,
+  type ExchangeKey,
+} from "./exchangeConfigs";
 
 type UiImage = StoredImage & { previewUrl: string };
 
 function App() {
+  const [exchangeKey, setExchangeKey] = useState<ExchangeKey>(DEFAULT_EXCHANGE_KEY);
   const [coinName, setCoinName] = useState("");
   const [type, setType] = useState(0);
   const [loverage, setLoverage] = useState(10);
@@ -22,6 +29,7 @@ function App() {
   const [dateAndTime, setDateAndTime] = useState("");
   const [images, setImages] = useState<UiImage[]>([]);
   const previewUrlsRef = useRef<Map<number, string>>(new Map());
+  const exchange = EXCHANGE_CONFIGS[exchangeKey];
 
   const selectedBackgroundUrl = useMemo(() => {
     return images.find((image) => image.id === backgroundId)?.previewUrl;
@@ -30,7 +38,7 @@ function App() {
   useEffect(() => {
     const previewUrls = previewUrlsRef.current;
 
-    void loadImages();
+    void loadImages(exchangeKey);
 
     return () => {
       for (const url of previewUrls.values()) {
@@ -38,10 +46,10 @@ function App() {
       }
       previewUrls.clear();
     };
-  }, []);
+  }, [exchangeKey]);
 
-  async function loadImages() {
-    const storedImages = await getStoredImages();
+  async function loadImages(currentExchange: ExchangeKey) {
+    const storedImages = await getStoredImages(currentExchange);
 
     const next = storedImages.map((image) => {
       const existingUrl = previewUrlsRef.current.get(image.id);
@@ -84,8 +92,8 @@ function App() {
 
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
 
-    await Promise.all(imageFiles.map((file) => addStoredImage(file)));
-    await loadImages();
+    await Promise.all(imageFiles.map((file) => addStoredImage(file, exchangeKey)));
+    await loadImages(exchangeKey);
 
     event.target.value = "";
   }
@@ -96,12 +104,23 @@ function App() {
     }
 
     await deleteStoredImage(backgroundId);
-    await loadImages();
+    await loadImages(exchangeKey);
   }
 
   return (
     <>
       <h1>Vovastik</h1>
+
+      <div className="form-row">
+        <label>Біржа:</label>
+        <select value={exchangeKey} onChange={(e) => setExchangeKey(e.target.value as ExchangeKey)}>
+          {EXCHANGE_ORDER.map((key) => (
+            <option key={key} value={key}>
+              {EXCHANGE_CONFIGS[key].title}
+            </option>
+          ))}
+        </select>
+      </div>
       
       <div className="form-row">
         <label>Назва монети:</label>
@@ -220,6 +239,7 @@ function App() {
       </div>
 
       <ImageComponent
+        exchange={exchange}
         coinName={coinName}
         type={type}
         loverage={loverage}

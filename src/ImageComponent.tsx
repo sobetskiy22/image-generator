@@ -9,27 +9,29 @@ import {
   Rectangle,
   Graphics,
 } from "pixi.js";
-import logo from "./assets/logo_latest_poster.d11a5ee.svg";
 import { percentPnL } from "./utils";
+import type { ExchangeConfig } from "./exchangeConfigs";
 
 type ImageComponentProps = {
+  exchange: ExchangeConfig;
   coinName: string;
   type: number;
   loverage: number;
   inputPrice: string;
   closePrice: string;
   backgroundUrl?: string;
-  dateAndTime: string
+  dateAndTime: string;
 };
 
 export function ImageComponent({
+  exchange,
   coinName,
   type,
   loverage,
   inputPrice,
   closePrice,
   backgroundUrl,
-  dateAndTime
+  dateAndTime,
 }: ImageComponentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [app, setApp] = useState<Application | null>(null);
@@ -37,273 +39,126 @@ export function ImageComponent({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const app = new Application();
-    app
+    let isDisposed = false;
+    const nextApp = new Application();
+
+    nextApp
       .init({
         background: "#000000",
-        width: 960,
-        height: 1070,
+        width: exchange.imageSize.width,
+        height: exchange.imageSize.height,
         resolution: window.devicePixelRatio,
         antialias: true,
       })
       .then(() => {
-        setApp(app);
+        if (isDisposed) {
+          nextApp.destroy(true);
+          return;
+        }
+        setApp(nextApp);
       });
-  }, []);
+
+    return () => {
+      isDisposed = true;
+      nextApp.destroy(true);
+      setApp(null);
+    };
+  }, [exchange]);
 
   useEffect(() => {
     if (!app) {
       return;
     }
 
-    const f = async () => {
+    const render = async () => {
       await document.fonts.ready;
       app.stage.removeChildren();
-      //@ts-expect-error needed for pixi app debugging handle on globalThis
+      // @ts-expect-error needed for pixi app debugging handle on globalThis
       globalThis.__PIXI_APP__ = app;
       if (!containerRef.current) {
         return;
       }
-      containerRef.current.appendChild(app.canvas as HTMLCanvasElement);
 
-      const background = backgroundUrl ? await buildBackgroundSprite(backgroundUrl) : null;
-      const logoTexture = await Assets.load(logo); // logo = URL до svg
-      const sprite = new Sprite(logoTexture);
-      sprite.position.set(49, 53);
-      sprite.scale.set(0.62);
+      if (!containerRef.current.contains(app.canvas as HTMLCanvasElement)) {
+        containerRef.current.appendChild(app.canvas as HTMLCanvasElement);
+      }
 
-      //Currecy Text
-      const currencyTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 49,
-        fontWeight: "400",
-        fill: "#ffffff",
-      });
-
-      const currencyText = new Text({
-        text: coinName,
-        style: currencyTextStyle,
-      });
-      currencyText.position.set(50, 227);
-
-      //Perp Text
-      const perpTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 35,
-        fontWeight: "400",
-        fill: "#ffffff",
-      });
-
-      const perpText = new Text({
-        text: "Perp",
-        style: perpTextStyle,
-      });
-      perpText.position.set(currencyText.x + currencyText.width + 39, 235);
-      perpText.zIndex = 2;
-      const rect = new Graphics()
-        .fill("#282828")
-        .drawRoundedRect(
-          perpText.x - 15,
-          perpText.y + 3,
-          perpText.width + 30,
-          perpText.height,
-          12
-        )
-        .endFill();
-
-      //Type Text
-      const typeTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 36,
-        fontWeight: "400",
-        fill: !type ? "#24c18d" : "#f14b3f",
-      });
-
-      const typeText = new Text({
-        text: !type ? "Лонг позиция" : "Шорт позиция",
-        style: typeTextStyle,
-      });
-      typeText.position.set(50, 309);
-
-      //Divider
-      const dividerTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 36,
-        fontWeight: "400",
-        fill: "#8b8b8e",
-      });
-
-      const dividerText = new Text({
-        text: "    |    ",
-        style: dividerTextStyle,
-      });
-      dividerText.position.set(typeText.width + typeText.x, 309);
-
-      //Multiplier
-      const multiplierTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 36,
-        fontWeight: "400",
-        fill: "#ffffff",
-      });
-
-      const multiplierText = new Text({
-        text: `${loverage}x`,
-        style: multiplierTextStyle,
-      });
-      multiplierText.position.set(dividerText.width + dividerText.x, 309);
-
-      let pnl = 1;
-
-      if (inputPrice && closePrice) {
-        pnl = percentPnL(
-          Number(inputPrice.replace(",", ".")),
-          Number(closePrice.replace(",", ".")),
+      if (exchange.layout === "legacy") {
+        await renderLegacyTemplate({
+          app,
+          exchange,
+          coinName,
           type,
-          loverage
-        );
+          loverage,
+          inputPrice,
+          closePrice,
+          backgroundUrl,
+          dateAndTime,
+        });
+        return;
       }
 
-      let pnlColor = "";
-      if (pnl > 0) {
-        pnlColor = "#24c18d";
-      } else {
-        pnlColor = "#f14b3f";
-      }
-
-      //PNL Text
-      const pnlTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 98,
-        fontWeight: "500",
-        fill: pnlColor,
+      await renderCompactTemplate({
+        app,
+        exchange,
+        coinName,
+        type,
+        loverage,
+        inputPrice,
+        closePrice,
+        backgroundUrl,
       });
-
-      const pnlText = new Text({
-        text: pnl > 0 ? `+${pnl.toFixed(2) + "%"}` : pnl.toFixed(2) + "%",
-        style: pnlTextStyle,
-      });
-      pnlText.position.set(49, 378);
-
-      //Gray
-      const grayTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 38,
-        fontWeight: "300",
-        fill: "#8b8b8e",
-      });
-
-      const whiteTextStyle = new TextStyle({
-        fontFamily: "Plus Jakarta Sans, sans-serif",
-        fontSize: 38,
-        fontWeight: "300",
-        fill: "#ffffff",
-      });
-
-      const introLabelText = new Text({
-        text: "Цена входа  ",
-        style: grayTextStyle,
-      });
-      introLabelText.position.set(50, 868);
-
-      const introText = new Text({
-        text: inputPrice,
-        style: whiteTextStyle,
-      });
-      introText.position.set(introLabelText.width + introLabelText.x, 868);
-
-      const outroLabelText = new Text({
-        text: "Цена маркировки  ",
-        style: grayTextStyle,
-      });
-      outroLabelText.position.set(50, 930);
-
-      const outroText = new Text({
-        text: closePrice,
-        style: whiteTextStyle,
-      });
-      outroText.position.set(outroLabelText.width + outroLabelText.x, 930);
-
-      const dateText = new Text({
-        text: "Репост  " + dateAndTime,
-        style: grayTextStyle,
-      });
-      dateText.position.set(50, 992);
-
-      const children = [
-        pnlText,
-        typeText,
-        currencyText,
-        sprite,
-        introLabelText,
-        outroLabelText,
-        introText,
-        outroText,
-        dateText,
-        dividerText,
-        multiplierText,
-        perpText,
-        rect,
-      ];
-
-      if (background) {
-        children.unshift(background);
-      }
-
-      children.forEach((child) => app.stage.addChild(child));
     };
 
-    f()
-
-  }, [coinName, type, loverage, inputPrice, closePrice, backgroundUrl, dateAndTime, app]);
+    void render();
+  }, [coinName, type, loverage, inputPrice, closePrice, backgroundUrl, dateAndTime, app, exchange]);
 
   async function downloadImage() {
     if (!app) return;
 
+    const { width, height } = exchange.imageSize;
     const img = await app.renderer.extract.image({
       target: app.stage,
       format: "png",
       quality: 0.8,
-      frame: new Rectangle(0, 0, 960, 1070),
+      frame: new Rectangle(0, 0, width, height),
       resolution: 2,
       antialias: true,
     });
 
     const link = document.createElement("a");
-    link.download = "image.png";
+    link.download = exchange.downloadFileName;
     link.href = img.src;
     link.click();
   }
 
   async function copyImageToClipboard() {
-  if (!app) return;
+    if (!app) return;
 
-  const canvas = await app.renderer.extract.canvas({
-    target: app.stage,
-    frame: new Rectangle(0, 0, 960, 1070),
-    resolution: 2,
-    antialias: true,
-  });
+    const { width, height } = exchange.imageSize;
+    const canvas = await app.renderer.extract.canvas({
+      target: app.stage,
+      frame: new Rectangle(0, 0, width, height),
+      resolution: 2,
+      antialias: true,
+    });
 
-  const blob: Blob | null = await new Promise((resolve) => {
-    if (canvas.toBlob) {
-      canvas.toBlob((blob) => {
-        resolve(blob);
-      }, "image/png", 0.8);
-    }
-  });
+    const blob: Blob | null = await new Promise((resolve) => {
+      if (canvas.toBlob) {
+        canvas.toBlob((nextBlob) => {
+          resolve(nextBlob);
+        }, "image/png", 0.8);
+      }
+    });
 
-  if (!blob) return;
+    if (!blob) return;
 
-  // Копіюємо в буфер
-  await navigator.clipboard.write([
-    new ClipboardItem({
-      "image/png": blob,
-    }),
-  ]);
-
-  console.log("Image copied to clipboard ✅");
-}
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "image/png": blob,
+      }),
+    ]);
+  }
 
   return (
     <>
@@ -318,7 +173,424 @@ export function ImageComponent({
   );
 }
 
-async function buildBackgroundSprite(backgroundUrl: string): Promise<Sprite | null> {
+type RenderBaseProps = {
+  app: Application;
+  exchange: ExchangeConfig;
+  coinName: string;
+  type: number;
+  loverage: number;
+  inputPrice: string;
+  closePrice: string;
+  backgroundUrl?: string;
+};
+
+type RenderLegacyProps = RenderBaseProps & {
+  dateAndTime: string;
+};
+
+async function renderLegacyTemplate({
+  app,
+  exchange,
+  coinName,
+  type,
+  loverage,
+  inputPrice,
+  closePrice,
+  backgroundUrl,
+  dateAndTime,
+}: RenderLegacyProps) {
+  const { legacy } = exchange.texts;
+  const background = backgroundUrl ? await buildBackgroundSpriteLegacy(backgroundUrl) : null;
+  const logoTexture = await Assets.load(exchange.logoSrc);
+  const sprite = new Sprite(logoTexture);
+  sprite.position.set(49, 53);
+  sprite.scale.set(0.62);
+
+  const currencyTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 49,
+    fontWeight: "400",
+    fill: "#ffffff",
+  });
+
+  const currencyText = new Text({
+    text: coinName,
+    style: currencyTextStyle,
+  });
+  currencyText.position.set(50, 227);
+
+  const perpTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 35,
+    fontWeight: "400",
+    fill: "#ffffff",
+  });
+
+  const perpText = new Text({
+    text: legacy.perp,
+    style: perpTextStyle,
+  });
+  perpText.position.set(currencyText.x + currencyText.width + 39, 235);
+  perpText.zIndex = 2;
+
+  const rect = new Graphics()
+    .fill("#282828")
+    .drawRoundedRect(
+      perpText.x - 15,
+      perpText.y + 3,
+      perpText.width + 30,
+      perpText.height,
+      12
+    )
+    .endFill();
+
+  const typeTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 36,
+    fontWeight: "400",
+    fill: type === 0 ? "#24c18d" : "#f14b3f",
+  });
+
+  const typeText = new Text({
+    text: type === 0 ? legacy.side.long : legacy.side.short,
+    style: typeTextStyle,
+  });
+  typeText.position.set(50, 309);
+
+  const dividerTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 36,
+    fontWeight: "400",
+    fill: "#8b8b8e",
+  });
+
+  const dividerText = new Text({
+    text: legacy.divider,
+    style: dividerTextStyle,
+  });
+  dividerText.position.set(typeText.width + typeText.x, 309);
+
+  const multiplierTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 36,
+    fontWeight: "400",
+    fill: "#ffffff",
+  });
+
+  const multiplierText = new Text({
+    text: legacy.leverage(loverage),
+    style: multiplierTextStyle,
+  });
+  multiplierText.position.set(dividerText.width + dividerText.x, 309);
+
+  const pnl = getPnl(inputPrice, closePrice, type, loverage);
+  const pnlColor = pnl > 0 ? "#24c18d" : "#f14b3f";
+
+  const pnlTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 98,
+    fontWeight: "500",
+    fill: pnlColor,
+  });
+
+  const pnlText = new Text({
+    text: legacy.pnlPercent(pnl),
+    style: pnlTextStyle,
+  });
+  pnlText.position.set(49, 378);
+
+  const grayTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 38,
+    fontWeight: "300",
+    fill: "#8b8b8e",
+  });
+
+  const whiteTextStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 38,
+    fontWeight: "300",
+    fill: "#ffffff",
+  });
+
+  const introLabelText = new Text({
+    text: legacy.entryPriceLabel,
+    style: grayTextStyle,
+  });
+  introLabelText.position.set(50, 868);
+
+  const introText = new Text({
+    text: inputPrice,
+    style: whiteTextStyle,
+  });
+  introText.position.set(introLabelText.width + introLabelText.x, 868);
+
+  const outroLabelText = new Text({
+    text: legacy.markPriceLabel,
+    style: grayTextStyle,
+  });
+  outroLabelText.position.set(50, 930);
+
+  const outroText = new Text({
+    text: closePrice,
+    style: whiteTextStyle,
+  });
+  outroText.position.set(outroLabelText.width + outroLabelText.x, 930);
+
+  const dateText = new Text({
+    text: legacy.repostWithDate(dateAndTime),
+    style: grayTextStyle,
+  });
+  dateText.position.set(50, 992);
+
+  const children = [
+    pnlText,
+    typeText,
+    currencyText,
+    sprite,
+    introLabelText,
+    outroLabelText,
+    introText,
+    outroText,
+    dateText,
+    dividerText,
+    multiplierText,
+    perpText,
+    rect,
+  ];
+
+  if (background) {
+    children.unshift(background);
+  }
+
+  children.forEach((child) => app.stage.addChild(child));
+}
+
+async function renderCompactTemplate({
+  app,
+  exchange,
+  coinName,
+  type,
+  loverage,
+  inputPrice,
+  closePrice,
+  backgroundUrl,
+}: RenderBaseProps) {
+  const { compact } = exchange.texts;
+  const { width, height } = exchange.imageSize;
+  const background = backgroundUrl
+    ? await buildBackgroundSpriteCompact(backgroundUrl, width, height)
+    : null;
+
+  const logoTexture = await Assets.load(exchange.logoSrc);
+  const logoSprite = new Sprite(logoTexture);
+  logoSprite.position.set(50, 48);
+  logoSprite.scale.set(0.37);
+
+  const mainTitleStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 34.5,
+    fontWeight: "500",
+    fill: "#ffffff",
+  });
+
+  const rowMainStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 43.5,
+    fontWeight: "700",
+    fill: "#ffffff",
+  });
+
+  const rowSeparatorStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 35,
+    fontWeight: "normal",
+    fill: "#6d7384",
+  });
+
+  const rowSideStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 43.5,
+    fontWeight: "700",
+    fill: type === 0 ? "#00e28a" : "#f14b3f",
+  });
+
+  const grayStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 32,
+    fontWeight: "400",
+    fill: "#7f8596",
+  });
+
+  const valueStyle = new TextStyle({
+    fontFamily: "Plus Jakarta Sans, sans-serif",
+    fontSize: 32,
+    fontWeight: "500",
+    fill: "#7f8596",
+  });
+
+  const pnlTitle = new Text({
+    text: compact.unrealizedPnL,
+    style: mainTitleStyle,
+  });
+  pnlTitle.position.set(48, 213);
+
+  const sideText = type === 0 ? compact.side.long : compact.side.short;
+  const compactPair = compact.normalizePair(coinName || compact.defaultPair);
+  const leverageText = compact.leverage(loverage);
+
+  const pairText = new Text({
+    text: compactPair,
+    style: rowMainStyle,
+  });
+  pairText.position.set(48, 278);
+
+  const separatorLeftText = new Text({
+    text: compact.separator,
+    style: rowSeparatorStyle,
+  });
+  separatorLeftText.position.set(pairText.x + pairText.width + 35, 280.5);
+
+  const sideValueText = new Text({
+    text: sideText,
+    style: rowSideStyle,
+  });
+  sideValueText.position.set(separatorLeftText.x + separatorLeftText.width + 12, 278);
+
+  const separatorRightText = new Text({
+    text: compact.separator,
+    style: rowSeparatorStyle,
+  });
+  separatorRightText.position.set(sideValueText.x + sideValueText.width + 14, 280.5);
+
+  const leverageValueText = new Text({
+    text: leverageText,
+    style: rowMainStyle,
+  });
+  leverageValueText.position.set(separatorRightText.x + separatorRightText.width + 6, 278);
+
+  const profitTitle = new Text({
+    text: compact.profitability,
+    style: grayStyle,
+  });
+  profitTitle.position.set(48, 377);
+
+  const profitSubtitle = compact.profitabilityPercent
+    ? new Text({
+        text: compact.profitabilityPercent,
+        style: new TextStyle({
+          ...grayStyle,
+          fontSize: 34,
+        }),
+      })
+    : null;
+  if (profitSubtitle) {
+    profitSubtitle.position.set(48, 486);
+  }
+
+  const pnlSigned = getPnl(inputPrice, closePrice, type, loverage);
+  const pnlUnsigned = getPnl(inputPrice, closePrice, type, loverage, { unsigned: true });
+  const pnlColor = pnlSigned >= 0 ? "#24c18d" : "#f14b3f";
+  const pnlText = new Text({
+    text: `${pnlUnsigned.toFixed(2)}%`,
+    style: new TextStyle({
+      fontFamily: "Plus Jakarta Sans, sans-serif",
+      fontSize: 110,
+      fontWeight: "600",
+      fill: pnlColor,
+    }),
+  });
+  pnlText.position.set(46, profitSubtitle ? 530 : 420);
+
+  const lastPriceLabel = new Text({
+    text: compact.lastPrice,
+    style: new TextStyle({
+      ...grayStyle,
+      fontSize: 58,
+      fontWeight: "400",
+    }),
+  });
+  lastPriceLabel.position.set(48, height - 176);
+
+  const lastPriceValue = new Text({
+    text: closePrice || compact.emptyValue,
+    style: valueStyle
+  });
+  lastPriceValue.position.set(lastPriceLabel.x + lastPriceLabel.width + 50, height - 176);
+
+  const entryPriceLabel = new Text({
+    text: compact.entryPrice,
+    style: new TextStyle({
+      ...grayStyle,
+      fontSize: 58,
+      fontWeight: "400",
+    }),
+  });
+  entryPriceLabel.position.set(48, height - 115);
+
+  const entryPriceValue = new Text({
+    text: inputPrice || compact.emptyValue,
+    style: valueStyle
+  });
+  entryPriceValue.position.set(entryPriceLabel.x + entryPriceLabel.width + 44, height - 115);
+
+  const children = [
+    logoSprite,
+    pnlTitle,
+    pairText,
+    separatorLeftText,
+    sideValueText,
+    separatorRightText,
+    leverageValueText,
+    profitTitle,
+    pnlText,
+    lastPriceLabel,
+    lastPriceValue,
+    entryPriceLabel,
+    entryPriceValue,
+  ];
+
+  if (profitSubtitle) {
+    children.push(profitSubtitle);
+  }
+
+  if (background) {
+    children.unshift(background);
+  }
+
+  children.forEach((child) => app.stage.addChild(child));
+}
+
+type GetPnlOptions = {
+  unsigned?: boolean;
+};
+
+function getPnl(
+  inputPrice: string,
+  closePrice: string,
+  type: number,
+  loverage: number,
+  options: GetPnlOptions = {}
+): number {
+  if (!inputPrice || !closePrice) {
+    return 0;
+  }
+
+  const pnl = percentPnL(
+    Number(inputPrice.replace(",", ".")),
+    Number(closePrice.replace(",", ".")),
+    type,
+    loverage
+  );
+
+  if (options.unsigned) {
+    return Math.abs(pnl);
+  }
+
+  return pnl;
+}
+
+async function buildBackgroundSpriteLegacy(backgroundUrl: string): Promise<Sprite | null> {
   try {
     const texture = await loadTextureFromUrl(backgroundUrl);
 
@@ -329,6 +601,40 @@ async function buildBackgroundSprite(backgroundUrl: string): Promise<Sprite | nu
     const background = new Sprite(texture);
     background.zIndex = -1;
     return background;
+  } catch (error) {
+    console.error("Failed to load background texture", error);
+    return null;
+  }
+}
+
+async function buildBackgroundSpriteCompact(
+  backgroundUrl: string,
+  targetWidth: number,
+  targetHeight: number
+): Promise<Sprite | null> {
+  try {
+    const texture = await loadTextureFromUrl(backgroundUrl);
+
+    if (!texture) {
+      return null;
+    }
+
+    const sprite = new Sprite(texture);
+    const sourceWidth = texture.width;
+    const sourceHeight = texture.height;
+
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      return null;
+    }
+
+    const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+    sprite.width = sourceWidth * scale;
+    sprite.height = sourceHeight * scale;
+    sprite.x = 0
+    sprite.y = 0
+    sprite.zIndex = -1;
+
+    return sprite;
   } catch (error) {
     console.error("Failed to load background texture", error);
     return null;
