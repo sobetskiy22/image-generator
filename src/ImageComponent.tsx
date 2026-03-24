@@ -496,10 +496,9 @@ async function renderCompactTemplate({
   }
 
   const pnlSigned = getPnl(inputPrice, closePrice, type, loverage);
-  const pnlUnsigned = getPnl(inputPrice, closePrice, type, loverage, { unsigned: true });
   const pnlColor = pnlSigned >= 0 ? "#24c18d" : "#f14b3f";
   const pnlText = new Text({
-    text: formatPercentTruncated(pnlUnsigned, { unsigned: true }),
+    text: formatPercentTruncated(pnlSigned),
     style: new TextStyle({
       fontFamily: compactFontFamily,
       fontSize: 125,
