@@ -377,7 +377,12 @@ async function renderCompactTemplate({
   backgroundUrl,
 }: RenderBaseProps) {
   const compactFontFamily = 'HarmonyOS EnNumber, -apple-system, BlinkMacSystemFont, sans-serif';
-  await document.fonts.load('400 16px "HarmonyOS EnNumber"');
+  await Promise.all([
+    document.fonts.load('400 16px "HarmonyOS EnNumber"'),
+    document.fonts.load('500 16px "HarmonyOS EnNumber"'),
+    document.fonts.load('600 16px "HarmonyOS EnNumber"'),
+    document.fonts.load('700 16px "HarmonyOS EnNumber"'),
+  ]);
   const { compact } = exchange.texts;
   const { width, height } = exchange.imageSize;
   const background = backgroundUrl
@@ -399,7 +404,7 @@ async function renderCompactTemplate({
   const rowMainStyle = new TextStyle({
     fontFamily: compactFontFamily,
     fontSize: 43.5,
-    fontWeight: "700",
+    fontWeight: "600",
     fill: "#ffffff",
   });
 
@@ -498,7 +503,7 @@ async function renderCompactTemplate({
     style: new TextStyle({
       fontFamily: compactFontFamily,
       fontSize: 125,
-      fontWeight: "600",
+      fontWeight: "500",
       fill: pnlColor,
     }),
   });
